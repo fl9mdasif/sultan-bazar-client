@@ -1,0 +1,217 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { getUserInfo } from "@/services/auth.services";
+import { useGetAllProductsQuery } from "@/redux/api/productApi";
+import { useGetAllOrdersQuery } from "@/redux/api/orderApi";
+import { useGetAllUsersQuery } from "@/redux/api/userApi";
+import SalesChart from "@/components/dashboard/SalesChart";
+import OrderStatusPieChart from "@/components/dashboard/OrderStatusPieChart";
+import {
+    Package, ShoppingCart, Users, TrendingUp, Shield,
+    Bell, ChevronRight, Settings, CheckCircle, XCircle,
+    Clock, Truck, Tags
+} from "lucide-react";
+
+const quickLinks = [
+    { label: "Manage Categories", href: "/dashboard/admin/categories", icon: Tags, desc: "Add, edit & delete categories" },
+    { label: "Manage Products", href: "/dashboard/superadmin/products", icon: Package, desc: "Add, edit & delete products" },
+    { label: "All Orders", href: "/dashboard/superadmin/orders", icon: ShoppingCart, desc: "Track & update order statuses" },
+    { label: "Manage Users", href: "/dashboard/superadmin/users", icon: Users, desc: "View & manage accounts" },
+    { label: "Site Settings", href: "/dashboard/superadmin/settings", icon: Settings, desc: "Configure platform settings" },
+];
+
+export default function SuperAdminDashboard() {
+    const router = useRouter();
+    const [userName, setUserName] = useState("");
+
+    const { data: productsData } = useGetAllProductsQuery({ limit: 1 });
+    const { data: ordersData } = useGetAllOrdersQuery(undefined);
+    const { data: usersData } = useGetAllUsersQuery({ limit: 1 });
+
+    const totalProducts =
+        productsData?.meta?.total ??
+        productsData?.data?.meta?.total ??
+        productsData?.data?.total ?? 0;
+
+    const totalUsers =
+        usersData?.meta?.total ??
+        usersData?.data?.meta?.total ??
+        usersData?.total ??
+        usersData?.data?.total ?? 0;
+
+    const ordersArray: any[] = Array.isArray(ordersData?.data?.data)
+        ? ordersData.data.data
+        : Array.isArray(ordersData?.data)
+            ? ordersData.data
+            : Array.isArray(ordersData)
+                ? ordersData
+                : [];
+
+    const totalOrders = ordersArray.length;
+    const pendingOrders = ordersArray.filter((o: any) => o.orderStatus === "pending").length;
+    const confirmedOrders = ordersArray.filter((o: any) => o.orderStatus === "confirmed").length;
+    const processingOrders = ordersArray.filter((o: any) => o.orderStatus === "processing").length;
+    const shippedOrders = ordersArray.filter((o: any) => o.orderStatus === "shipped").length;
+    const deliveredOrders = ordersArray.filter((o: any) => o.orderStatus === "delivered").length;
+    const cancelledOrders = ordersArray.filter((o: any) => o.orderStatus === "cancelled").length;
+    const returnedOrders = ordersArray.filter((o: any) => o.orderStatus === "returned").length;
+    const revenue = ordersArray
+        .filter((o: any) => o.orderStatus === "delivered")
+        .reduce((acc: number, o: any) => acc + (o.totalAmount || 0), 0);
+
+    const recentOrders = [...ordersArray]
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+
+    const statCards = [
+        { label: "Total Users", value: totalUsers, icon: Users, color: "#7c3aed", bg: "#7c3aed15" },
+        { label: "Total Products", value: totalProducts, icon: Package, color: "#B5451B", bg: "#B5451B15" },
+        { label: "Total Orders", value: totalOrders, icon: ShoppingCart, color: "#D4860A", bg: "#D4860A15" },
+        { label: "Total Sales", value: `৳${revenue.toLocaleString()}`, icon: TrendingUp, color: "#059669", bg: "#05966915" },
+        { label: "Pending", value: pendingOrders, icon: Clock, color: "#f59e0b", bg: "#f59e0b15" },
+        { label: "Confirmed", value: confirmedOrders, icon: CheckCircle, color: "#3b82f6", bg: "#3b82f615" },
+        { label: "Processing", value: processingOrders, icon: Settings, color: "#8b5cf6", bg: "#8b5cf615" },
+        { label: "Shipped", value: shippedOrders, icon: Truck, color: "#0ea5e9", bg: "#0ea5e915" },
+        { label: "Delivered", value: deliveredOrders, icon: CheckCircle, color: "#10b981", bg: "#10b98115" },
+        { label: "Cancelled", value: cancelledOrders, icon: XCircle, color: "#ef4444", bg: "#ef444415" },
+        { label: "Returned", value: returnedOrders, icon: XCircle, color: "#6b7280", bg: "#6b728015" },
+    ];
+
+    const statusColor = (s: string) =>
+        s === "delivered" ? "text-green-700 bg-green-50 border-green-200" :
+            s === "cancelled" ? "text-red-700 bg-red-50 border-red-200" :
+                s === "shipped" ? "text-blue-700 bg-blue-50 border-blue-200" :
+                    s === "pending" ? "text-orange-700 bg-orange-50 border-orange-200" :
+                        "text-gray-700 bg-gray-50 border-gray-200";
+
+    useEffect(() => {
+        const user = getUserInfo();
+        if (!user) { router.replace("/login"); return; }
+        if (user.role !== "superadmin") { router.replace(`/dashboard/${user.role}`); return; }
+        setUserName(user.name || user.username || "Super Admin");
+    }, [router]);
+
+    return (
+        <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Super Admin Panel 🛡️</h1>
+                    <p className="text-gray-500 text-sm mt-1">Welcome, {userName}. Full platform control.</p>
+                </div>
+                <button className="p-2 rounded-xl hover:bg-white text-gray-500 hover:text-gray-700 transition-colors">
+                    <Bell className="w-5 h-5" />
+                </button>
+            </div>
+
+            {/* Role badge */}
+            <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold"
+                style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}>
+                <Shield className="w-4 h-4" />
+                Super Admin Access — Full Privileges
+            </div>
+
+            {/* Stat cards — 4 on desktop, 2 on mobile */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                {statCards.map((s) => (
+                    <div key={s.label} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                        <div className="mb-3">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                                style={{ background: s.bg }}>
+                                <s.icon className="w-4 h-4" style={{ color: s.color }} />
+                            </div>
+                        </div>
+                        <p className="text-xl font-bold text-gray-900">{s.value}</p>
+                        <p className="text-xs font-medium text-gray-500 mt-0.5">{s.label}</p>
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+                {/* Sales Chart */}
+                <div className="xl:col-span-2">
+                    <SalesChart />
+                </div>
+
+                {/* Order Status Pie Chart */}
+                <div className="xl:col-span-1">
+                    <OrderStatusPieChart orders={ordersArray} />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+                {/* Recent Orders */}
+                <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Recent Orders</h2>
+                        <Link href="/dashboard/superadmin/orders" className="text-xs font-semibold text-purple-600 hover:underline">
+                            View all →
+                        </Link>
+                    </div>
+                    {recentOrders.length === 0 ? (
+                        <p className="text-sm text-gray-400 py-6 text-center">No orders yet.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-gray-100">
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Order #</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Customer</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {recentOrders.map((order: any) => (
+                                        <tr key={order._id} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="py-3 px-3 font-semibold text-gray-900">{order.orderNumber}</td>
+                                            <td className="py-3 px-3 text-gray-600">{order.shippingAddress?.fullName || "—"}</td>
+                                            <td className="py-3 px-3 font-bold text-gray-900">৳{(order.totalAmount || 0).toLocaleString()}</td>
+                                            <td className="py-3 px-3">
+                                                <span className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase border ${statusColor(order.orderStatus)}`}>
+                                                    {order.orderStatus}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-3 text-gray-400 text-xs">
+                                                {new Date(order.createdAt).toLocaleDateString()}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* Quick Actions */}
+                <div className="xl:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-fit">
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Admin Controls</h2>
+                    <div className="space-y-2">
+                        {quickLinks.map((link) => (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-purple-400 hover:bg-purple-50 transition-all group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-white transition-colors flex-shrink-0">
+                                        <link.icon className="w-4 h-4 text-purple-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-800">{link.label}</p>
+                                        <p className="text-xs text-gray-400">{link.desc}</p>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
